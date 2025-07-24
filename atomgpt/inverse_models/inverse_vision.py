@@ -1,5 +1,8 @@
 from atomgpt.inverse_models.vision_utils import AtomGPTVisionDataCollator
-from atomgpt.inverse_models.vision_dataset import generate_dataset
+from atomgpt.inverse_models.vision_dataset import (
+    generate_dataset,
+    generate_dataset_from_csv,
+)
 import torch
 import os
 from jarvis.db.figshare import data
@@ -53,6 +56,11 @@ parser.add_argument(
     help="ID tag",
 )
 
+parser.add_argument(
+    "--root_dir",
+    default=None,
+    help="Path to id_prop.csv with POSCAR and PNG file names, and actual files",
+)
 parser.add_argument(
     "--output_folder",
     default="formula_based",
@@ -336,20 +344,30 @@ def run(
     id_tag="jid",
     model_name="unsloth/Llama-3.2-11B-Vision-Instruct",
     output_folder="formula_based",
+    root_dir=None,
     max_samples=None,
+    train_ratio=0.9,
 ):
-    # def run(datasets=["dft_3d", "dft_2d"], model_name="unsloth/Pixtral-12B-2409"):
-    train_datasets = []
-    test_datasets = []
-    for i in datasets:
-        train_dataset, test_dataset = generate_dataset(
-            dataset_name=i,
-            output_folder=output_folder,
-            id_tag=id_tag,
-            max_samples=max_samples,
+    if root_dir is None:
+        # def run(datasets=["dft_3d", "dft_2d"], model_name="unsloth/Pixtral-12B-2409"):
+        train_datasets = []
+        test_datasets = []
+        for i in datasets:
+            train_dataset, test_dataset = generate_dataset(
+                dataset_name=i,
+                output_folder=output_folder,
+                id_tag=id_tag,
+                max_samples=max_samples,
+            )
+            train_datasets.extend(train_dataset)
+            test_datasets.extend(test_dataset)
+    else:
+        dataset = generate_dataset_from_csv(
+            root_dir=root_dir, text_extra="", miller_index=""
         )
-        train_datasets.extend(train_dataset)
-        test_datasets.extend(test_dataset)
+        num_train_dataset = int(len(dataset) * train_ratio)
+        train_dataset = dataset[0:num_train_dataset]
+        test_dataset = dataset[num_train_dataset:]
     # model, tokenizer = get_model(model_name=model_name)
     model, tokenizer = get_model(model_name=model_name)
     # train_dataset = Dataset.from_list(train_dataset)
@@ -439,6 +457,7 @@ if __name__ == "__main__":
         id_tag=args.id_tag,
         output_folder=args.output_folder,
         max_samples=max_samples,
+        root_dir=args.root_dir,
     )
 
     # run(
