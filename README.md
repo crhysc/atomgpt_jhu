@@ -45,7 +45,7 @@ conda activate my_atomgpt
 ```
 
 ```
-git clone https://github.com/usnistgov/atomgpt.git
+git clone https://github.com/atomgptlab/atomgpt.git
 cd atomgpt
 pip install -e .
 ```
