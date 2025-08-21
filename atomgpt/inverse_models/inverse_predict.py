@@ -159,6 +159,7 @@ def predict(
             dtype=dtype,
             load_in_4bit=load_in_4bit,
             device_map="auto",
+            fast_inference=True,
         )
         FastLanguageModel.for_inference(model)
     except:
