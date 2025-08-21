@@ -45,7 +45,7 @@ conda activate my_atomgpt
 ```
 
 ```
-git clone https://github.com/usnistgov/atomgpt.git
+git clone https://github.com/atomgptlab/atomgpt.git
 cd atomgpt
 pip install -e .
 ```
@@ -137,8 +137,19 @@ python atomgpt/inverse_models/inverse_predict.py --output_dir outputs_xrd/checkp
 
 Example training:
 
+Change dft_2d to c2db or alex_pbe_2d_all if you need larger training set as given here https://atomgptlab.github.io/jarvis-tools/databases/.
+
+Remove max_samples command to train on entire dataset.
+
+
 ```
-python atomgpt/inverse_models/inverse_vision.py --max_samples 10
+python atomgpt/inverse_models/inverse_vision.py  --dataset dft_2d --max_samples 10
+```
+
+Using id_prop.csv like format for POSCAR files and corresponding images:
+
+```
+python atomgpt/inverse_models/inverse_vision.py --id_prop_path atomgpt/examples/inverse_model_vision/id_prop.csv
 ```
 
 Example inference:
@@ -184,10 +195,11 @@ https://huggingface.co/knc6
 
 1. [AtomGPT: Atomistic Generative Pretrained Transformer for Forward and Inverse Materials Design](https://pubs.acs.org/doi/full/10.1021/acs.jpclett.4c01126)
 2. [DiffractGPT: Atomic Structure Determination from X-ray Diffraction Patterns using Generative Pre-trained Transformer](https://pubs.acs.org/doi/10.1021/acs.jpclett.4c03137)
-3. [ChemNLP: A Natural Language Processing based Library for Materials Chemistry Text Data](https://github.com/usnistgov/chemnlp)
-4. [JARVIS-Leaderboard](https://pages.nist.gov/jarvis_leaderboard)
-5. [NIST-JARVIS Infrastructure](https://jarvis.nist.gov/)
-6. [Unsloth AI](https://github.com/unslothai/unsloth)
+3. [MicroscopyGPT: Generating Atomic-Structure Captions from Microscopy Images of 2D Materials with Vision-Language Transformers](https://pubs.acs.org/doi/10.1021/acs.jpclett.5c01257)
+4. [ChemNLP: A Natural Language Processing based Library for Materials Chemistry Text Data](https://github.com/usnistgov/chemnlp)
+5. [JARVIS-Leaderboard](https://pages.nist.gov/jarvis_leaderboard)
+6. [NIST-JARVIS Infrastructure](https://jarvis.nist.gov/)
+7. [Unsloth AI](https://github.com/unslothai/unsloth)
    
 
 

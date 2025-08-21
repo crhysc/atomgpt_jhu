@@ -511,6 +511,240 @@ class STEMDatasetGenerator:
         print(f"Test dataset saved to {test_path}")
 
 
+class ID_Prop_dataset:
+    def __init__(
+        self,
+        csv_file_path="id_prop.csv",
+        output_folder="output",
+        dataset_name="id_prop_dataset",
+        save_images=False,  # Whether to save processed images
+        add_artifacts=False,  # Whether to add noise/blur artifacts
+        train_ratio=0.9,
+        max_samples=None,
+    ):
+        self.csv_file_path = csv_file_path
+        self.output_folder = output_folder
+        self.dataset_name = dataset_name
+        self.save_images = save_images
+        self.add_artifacts = add_artifacts
+        self.train_ratio = train_ratio
+        self.max_samples = max_samples
+        # Create output folder if it doesn't exist
+        os.makedirs(self.output_folder, exist_ok=True)
+
+    def get_crystal_string_t(self, atoms):
+        """Generate crystal string representation from atoms object"""
+        lengths = atoms.lattice.abc  # Lattice lengths
+        angles = atoms.lattice.angles  # Lattice angles
+        atom_ids = atoms.elements  # Atom types
+        frac_coords = atoms.frac_coords  # Fractional coordinates
+
+        crystal_str = (
+            " ".join(["{0:.2f}".format(x) for x in lengths])
+            + "\n"
+            + " ".join([str(int(x)) for x in angles])
+            + "\n"
+            + "\n".join(
+                [
+                    str(t) + " " + " ".join(["{0:.3f}".format(x) for x in c])
+                    for t, c in zip(atom_ids, frac_coords)
+                ]
+            )
+        )
+        return crystal_str
+
+    def add_artifacts(self, image, artifact_type="noise", **kwargs):
+        """Add artifacts like noise, blur, distortion to images"""
+        if artifact_type == "noise":
+            noise_type = kwargs.get("noise_type", "gaussian")
+            var = kwargs.get("var", 0.01)
+            if noise_type == "gaussian":
+                image = random_noise(image, mode="gaussian", var=var)
+            elif noise_type == "poisson":
+                image = random_noise(image, mode="poisson")
+            image = (255 * image).astype("uint8")
+        elif artifact_type == "blur":
+            sigma = kwargs.get("sigma", 1)
+            image = gaussian_filter(image, sigma=sigma)
+        elif artifact_type == "distortion":
+            scale = kwargs.get("scale", 1.02)
+            transform = AffineTransform(scale=(scale, scale))
+            image = warp(image, transform, mode="wrap")
+            image = (255 * image).astype("uint8")
+        elif artifact_type == "stripe":
+            stripe_intensity = kwargs.get("stripe_intensity", 0.2)
+            stripe_period = kwargs.get("stripe_period", 10)
+            for i in range(0, image.shape[0], stripe_period):
+                image[i, :] = np.clip(
+                    image[i, :] + stripe_intensity * 255, 0, 255
+                )
+            image = image.astype("uint8")
+        return image
+
+    def read_csv(self):
+        """Read the CSV file and return list of [poscar_file, image_file] pairs"""
+        data = []
+        try:
+            with open(self.csv_file_path, "r") as f:
+                reader = csv.reader(f)
+
+                for row in reader:
+                    data.append([row[0].strip(), row[1].strip()])
+            if self.max_samples is not None:
+                return data[: self.max_samples]
+            return data
+        except Exception as e:
+            print(f"Error reading CSV file: {e}")
+            return []
+
+    def generate_dataset(self):
+        """Generate dataset from CSV file"""
+        dataset = []
+        csv_data = self.read_csv()
+        run_path = os.path.dirname(self.csv_file_path)
+        if not csv_data:
+            print("No data found in CSV file")
+            return dataset
+
+        for row in tqdm(csv_data, desc="Processing entries"):
+            try:
+                poscar_file, image_file = row
+
+                # Construct full paths
+                poscar_path = os.path.join(run_path, poscar_file)
+                image_path = os.path.join(run_path, image_file)
+
+                # Load POSCAR file (assuming you have Atoms class from jarvis-tools)
+                atoms = Atoms.from_poscar(poscar_path)
+
+                # Load image
+                pil_image = Image.open(image_path).convert("L")
+
+                # Apply artifacts if requested
+                if self.add_artifacts:
+                    # Convert PIL to numpy array
+                    img_array = np.array(pil_image)
+
+                    # Add noise
+                    noisy_image = self.add_artifacts(
+                        img_array, artifact_type="noise", var=0.02
+                    )
+
+                    # Add blur
+                    final_image = self.add_artifacts(
+                        noisy_image, artifact_type="blur", sigma=1
+                    )
+
+                    # Convert back to PIL
+                    pil_image = Image.fromarray(final_image).convert("L")
+
+                # Save processed image if requested
+                if self.save_images:
+                    base_name = os.path.splitext(
+                        os.path.basename(poscar_file)
+                    )[0]
+                    image_filename = f"{base_name}_processed.jpg"
+                    image_save_path = os.path.join(
+                        self.output_folder, image_filename
+                    )
+                    pil_image.save(image_save_path)
+
+                # Generate crystal string
+                poscar_string = self.get_crystal_string_t(atoms)
+
+                # Create question and explanation
+                question = (
+                    "The chemical formula is "
+                    + atoms.composition.reduced_formula
+                    + ". Generate atomic structure description with lattice lengths, angles, coordinates, and atom types."
+                )
+
+                explanation = f"\n{poscar_string}"
+
+                # Create dataset entry
+                entry_id = os.path.splitext(os.path.basename(poscar_file))[0]
+                dataset.append(
+                    {
+                        "id": entry_id,
+                        "messages": [
+                            {
+                                "content": [
+                                    {
+                                        "type": "text",
+                                        "text": question,
+                                    },
+                                    {
+                                        "type": "image",
+                                        "text": None,
+                                    },
+                                ],
+                                "role": "user",
+                            },
+                            {
+                                "content": [
+                                    {
+                                        "type": "text",
+                                        "text": explanation,
+                                    }
+                                ],
+                                "role": "assistant",
+                            },
+                        ],
+                        "images": [pil_image],
+                    }
+                )
+
+            except Exception as e:
+                print(f"Error processing row {row}: {e}")
+                continue
+
+        return dataset
+
+    def split_dataset(self):
+        """Split dataset into train and test sets"""
+        dataset = self.generate_dataset()
+        total_size = len(dataset)
+        train_size = int(total_size * self.train_ratio)
+
+        # Shuffle dataset
+        np.random.shuffle(dataset)
+
+        train_dataset = dataset[:train_size]
+        test_dataset = dataset[train_size:]
+
+        return train_dataset, test_dataset
+
+    def dump_dataset(self, train_dataset, test_dataset):
+        """Save datasets to JSON files"""
+        train_path = os.path.join(
+            self.output_folder, self.dataset_name + "_train_dataset.json"
+        )
+        test_path = os.path.join(
+            self.output_folder, self.dataset_name + "_test_dataset.json"
+        )
+
+        # Remove images from JSON (keep only metadata)
+        train_data = [
+            {k: v for k, v in item.items() if k != "images"}
+            for item in train_dataset
+        ]
+        test_data = [
+            {k: v for k, v in item.items() if k != "images"}
+            for item in test_dataset
+        ]
+
+        with open(train_path, "w") as f:
+            json.dump(train_data, f, indent=2)
+
+        with open(test_path, "w") as f:
+            json.dump(test_data, f, indent=2)
+
+        print(f"Train dataset saved to {train_path}")
+        print(f"Test dataset saved to {test_path}")
+
+        return train_path, test_path
+
+
 # Usage example
 
 
@@ -688,4 +922,13 @@ def generate_dataset_from_csv(
 
 
 if __name__ == "__main__":
-    train_dataset, test_dataset = generate_dataset(dataset_name="dft_3d")
+    csv_file_path = "../examples/inverse_model_vision/id_prop.csv"
+    train_dataset, test_dataset = ID_Prop_dataset(
+        csv_file_path=csv_file_path,
+        train_ratio=0.9,
+    ).split_dataset()
+    print("test_dataset", test_dataset[0])
+    train_dataset, test_dataset = generate_dataset(
+        dataset_name="dft_2d", max_samples=5
+    )
+    print("test_dataset", test_dataset[0])
