@@ -24,9 +24,9 @@ fonttools==4.58.0
 frozenlist==1.6.0
 fsspec==2025.3.0
 gguf==0.16.3
-hf-xet==1.1.2
+hf-xet>=1.1.2
 hf_transfer==0.1.9
-huggingface-hub==0.32.0
+huggingface-hub>=0.32.0
 idna==3.10
 imageio==2.37.0
 importlib_metadata==8.7.0
@@ -70,7 +70,7 @@ propcache==0.3.1
 protobuf==3.20.3
 psutil==7.0.0
 pyarrow==20.0.0
-pydantic==2.11.5
+pydantic>=2.11.5
 pydantic-settings==2.9.1
 pydantic_core==2.33.2
 Pygments==2.19.1
@@ -96,11 +96,11 @@ tifffile==2025.5.10
 tokenizers==0.21.1
 tomli==2.2.1
 toolz==1.0.0
-torch==2.7.0
-torchvision==0.22.0
+torch>=2.7.0
+torchvision>=0.22.0
 tqdm==4.67.1
-transformers==4.51.3
-triton==3.3.0
+transformers>=4.51.3
+triton>=3.3.0
 trl==0.15.2
 typeguard==4.4.2
 typing-inspection==0.4.1
@@ -110,7 +110,7 @@ tzdata==2025.2
 urllib3==2.4.0
 uv==0.7.8
 vllm==0.10.1.1
-xformers==0.0.30
+#xformers==0.0.30
 xmltodict==0.14.2
 xxhash==3.5.0
 yarl==1.20.0
