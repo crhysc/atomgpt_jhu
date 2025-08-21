@@ -216,6 +216,29 @@ class STEMConv(object):
 random.seed(42)
 
 
+def get_crystal_string_t(atoms):
+    # atoms = atoms.center(vacuum=1)
+    # atoms = atoms.center(vacuum=12)
+    lengths = atoms.lattice.abc  # Lattice lengths
+    angles = atoms.lattice.angles  # Lattice angles
+    atom_ids = atoms.elements  # Atom types
+    frac_coords = atoms.frac_coords  # Fractional coordinates
+
+    crystal_str = (
+        " ".join(["{0:.2f}".format(x) for x in lengths])
+        + "\n"
+        + " ".join([str(int(x)) for x in angles])
+        + "\n"
+        + "\n".join(
+            [
+                str(t) + " " + " ".join(["{0:.3f}".format(x) for x in c])
+                for t, c in zip(atom_ids, frac_coords)
+            ]
+        )
+    )
+    return crystal_str
+
+
 class STEMDatasetGenerator:
     def __init__(
         self,
@@ -305,71 +328,6 @@ class STEMDatasetGenerator:
                 return json.load(f)
         else:
             return data(self.dataset_name)
-
-    def generate_dataset_from_csv(self, id_prop_path, miller_index="(0 0 1)"):
-        with open(id_prop_path, "r") as f:
-            reader = csv.reader(f)
-            dt = [row for row in reader]
-        for i in tqdm(dt, total=len(dt)):
-            info = {}
-            pos_path = os.path.join(id_prop_path, i[0])
-            atoms = Atoms.from_poscar(pos_path)
-            pil_image = Image.open(i[1]).convert("L")
-
-            poscar_string = self.get_crystal_string_t(atoms)
-
-            question = (
-                "The chemical formula is "
-                + atoms.composition.reduced_formula
-                # "The chemical elements are "
-                # + str(
-                #    atoms.composition.search_string.replace(
-                #        "-", " ,"
-                #    )
-                # )
-                + ". Generate atomic structure description with lattice lengths, angles, coordinates, and atom types. Also predict the Miller index."
-            )
-            explanation = (
-                f"\n{poscar_string}"
-                + ". The miller index is ("
-                + str(" ".join(map(str, miller_index)))
-                + "). "
-            )
-
-            dataset.append(
-                {
-                    "id": i[0],
-                    "messages": [
-                        {
-                            "content": [
-                                {
-                                    "type": "text",
-                                    "text": question,
-                                    # "index": None,
-                                },
-                                {
-                                    "type": "image",
-                                    "text": None,
-                                    # "index": 0,
-                                },
-                            ],
-                            "role": "user",
-                        },
-                        {
-                            "content": [
-                                {
-                                    "type": "text",
-                                    "text": explanation,
-                                    # "index": None,
-                                }
-                            ],
-                            "role": "assistant",
-                        },
-                    ],
-                    "images": [pil_image],
-                }
-            )
-        return dataset
 
     def generate_dataset(self, input_dataset):
         dataset = []
@@ -890,6 +848,77 @@ def generate_dataset(
     print("Saving datasets...")
     generator.dump_dataset(train_dataset, test_dataset)
     return train_dataset, test_dataset
+
+
+def generate_dataset_from_csv(
+    root_dir,
+    train_ratio=0.9,
+    text_extra="Also predict the Miller index.",
+    miller_index="(0 0 1)",
+):
+
+    dataset = []
+    id_prop_path = os.path.join(root_dir, "id_prop.csv")
+    with open(id_prop_path, "r") as f:
+        reader = csv.reader(f)
+        dt = [row for row in reader]
+    for i in tqdm(dt, total=len(dt)):
+        info = {}
+        pos_path = os.path.join(root_dir, i[0])
+        atoms = Atoms.from_poscar(pos_path)
+        image_path = os.path.join(root_dir, i[1])
+        pil_image = Image.open(image_path).convert("L")
+
+        poscar_string = get_crystal_string_t(atoms)
+
+        question = (
+            "The chemical formula is "
+            + atoms.composition.reduced_formula
+            # "The chemical elements are "
+            # + str(
+            #    atoms.composition.search_string.replace(
+            #        "-", " ,"
+            #    )
+            # )
+            + ". Generate atomic structure description with lattice lengths, angles, coordinates, and atom types."
+            + text_extra
+        )
+        explanation = f"\n{poscar_string}" + miller_index
+
+        dataset.append(
+            {
+                "id": i[0],
+                "messages": [
+                    {
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": question,
+                                # "index": None,
+                            },
+                            {
+                                "type": "image",
+                                "text": None,
+                                # "index": 0,
+                            },
+                        ],
+                        "role": "user",
+                    },
+                    {
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": explanation,
+                                # "index": None,
+                            }
+                        ],
+                        "role": "assistant",
+                    },
+                ],
+                "images": [pil_image],
+            }
+        )
+    return dataset
 
 
 if __name__ == "__main__":

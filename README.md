@@ -158,6 +158,11 @@ Example inference:
 python atomgpt/inverse_models/inverse_vision_predict.py --image_path atomgpt/examples/inverse_model_vision/FeTe.png --formula FeTe
 ```
 
+Example to train models from id_prop.csv with POSCAR files and PNG files only
+
+```
+python inverse_models/inverse_vision.py --root_dir  examples/inverse_model_vision
+```
 More detailed examples/case-studies would be added here soon.
 
 <a name="notebooks"></a>
