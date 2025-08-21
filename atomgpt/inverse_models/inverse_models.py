@@ -99,6 +99,7 @@ class TrainingPropConfig(BaseSettings):
         " Generate atomic structure description with lattice lengths, angles, coordinates and atom types."
     )
     # num_val: Optional[int] = 2
+    deepspeed: Optional[str] = "atomgpt/examples/inverse_model/ds_ZeRO3.json"
 
 
 def get_input(config=None, chem="", val=10):
@@ -585,6 +586,7 @@ def main(config_file=None):
             num_train_epochs=config.num_epochs,
             save_strategy=config.save_strategy,
             save_steps=config.save_steps,
+            deepspeed=config.deepspeed,
         ),
     )
     if callback_samples > 0:
