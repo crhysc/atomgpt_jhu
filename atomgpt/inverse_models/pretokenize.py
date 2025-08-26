@@ -42,11 +42,11 @@ import json
 import argparse
 from typing import Literal
 import time
-from datasets import save_to_disk
+#from datasets import save_to_disk
 from jarvis.core.composition import Composition
-from .inverse_models import TrainingPropConfig
-from .inverse_models import make_alpaca_json
-from .inverse_models import formatting_prompts_func
+from atomgpt.inverse_models.inverse_models import TrainingPropConfig
+from atomgpt.inverse_models.inverse_models import make_alpaca_json
+from atomgpt.inverse_models.inverse_models import formatting_prompts_func
 
 parser = argparse.ArgumentParser(
     description="Atomistic Generative Pre-trained Transformer."
