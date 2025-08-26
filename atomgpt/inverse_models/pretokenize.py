@@ -42,6 +42,7 @@ import json
 import argparse
 from typing import Literal
 import time
+from datasets import save_to_disk
 from jarvis.core.composition import Composition
 from .inverse_models import TrainingPropConfig
 from .inverse_models import make_alpaca_json
@@ -257,6 +258,11 @@ def main(config_file=None):
     tokenized_eval.set_format(
         type="torch", columns=["input_ids", "attention_mask", "output"]
     )
+    
+    formatted_train_path = os.path.join(pretok_dir, "formatted_train.jsonl")
+    formatted_test_path  = os.path.join(pretok_dir, "formatted_test.jsonl")
+    train_dataset.to_json(formatted_train_path)
+    eval_dataset.to_json(formatted_test_path)
     
     tokenized_train.save_to_disk(os.path.join(pretok_dir, "train"))
     tokenized_eval.save_to_disk(os.path.join(pretok_dir, "test"))
