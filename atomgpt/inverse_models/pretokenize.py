@@ -101,12 +101,12 @@ def main(config_file=None):
     config = loadjson(config_file)
     config = TrainingPropConfig(**config)
     id_prop_path = config.id_prop_path
-    pretok_dir = os.path.join(id_prop_path, config.tokenizer_class)
+    base_dir = os.path.dirname(os.path.abspath(id_prop_path))
+    pretok_dir = os.path.join(base_dir, str(config.tokenizer_class))
+    os.makedirs(pretok_dir, exist_ok=True)
     pretok_config = make_pretok_config(config, pretok_dir)
     print("pretokenization parameters", pretok_config)
     pprint.pprint(pretok_config.dict())
-    if not os.path.exists(pretok_dir):
-        os.makedirs(pretok_dir)
     f = open(os.path.join(pretok_dir, "pretok_metadata.json"), "w")
     f.write(json.dumps(pretok_config.dict(), indent=4))
     f.close()
