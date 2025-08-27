@@ -19,6 +19,7 @@ from atomgpt.inverse_models.utils import (
 from trl import SFTTrainer, SFTConfig
 from peft import PeftModel
 from datasets import load_dataset
+from datasets import load_from_disk
 from functools import partial
 from jarvis.core.atoms import Atoms
 from jarvis.db.jsonutils import loadjson, dumpjson
@@ -365,89 +366,97 @@ def main(config_file=None):
     callback_samples = config.callback_samples
     # loss_function = config.loss_function
     # id_prop_path = os.path.join(run_path, id_prop_path)
-    with open(id_prop_path, "r") as f:
-        reader = csv.reader(f)
-        dt = [row for row in reader]
-    if not num_train:
-        num_test = int(len(dt) * config.test_ratio)
-        num_train = len(dt) - num_test
+    if config.use_pretokenized_data == False:
+        with open(id_prop_path, "r") as f:
+            reader = csv.reader(f)
+            dt = [row for row in reader]
+        if not num_train:
+            num_test = int(len(dt) * config.test_ratio)
+            num_train = len(dt) - num_test
 
-    dat = []
-    ids = []
-    for i in tqdm(dt, total=len(dt)):
-        info = {}
-        info["id"] = i[0]
-        ids.append(i[0])
-        tmp = [float(j) for j in i[1:]]
-        # print("tmp", tmp)
-        if len(tmp) == 1:
-            tmp = str(float(tmp[0]))
+        dat = []
+        ids = []
+        for i in tqdm(dt, total=len(dt)):
+            info = {}
+            info["id"] = i[0]
+            ids.append(i[0])
+            tmp = [float(j) for j in i[1:]]
+            # print("tmp", tmp)
+            if len(tmp) == 1:
+                tmp = str(float(tmp[0]))
+            else:
+                tmp = config.separator.join(map(str, tmp))
+
+            # if ";" in i[1]:
+            #    tmp = "\n".join([str(round(float(j), 2)) for j in i[1].split(";")])
+            # else:
+            #    tmp = str(round(float(i[1]), 3))
+            info[config.prop] = (
+                tmp  # float(i[1])  # [float(j) for j in i[1:]]  # float(i[1]
+            )
+            pth = os.path.join(run_path, info["id"])
+            if config.file_format == "poscar":
+                atoms = Atoms.from_poscar(pth)
+            elif config.file_format == "xyz":
+                atoms = Atoms.from_xyz(pth)
+            elif config.file_format == "cif":
+                atoms = Atoms.from_cif(pth)
+            elif config.file_format == "pdb":
+                # not tested well
+                atoms = Atoms.from_pdb(pth)
+            info["atoms"] = atoms.to_dict()
+            dat.append(info)
+
+        train_ids = ids[0:num_train]
+        print("num_train", num_train)
+        print("num_test", num_test)
+        test_ids = ids[num_train : num_train + num_test]
+        # test_ids = ids[num_train:]
+        alpaca_prop_train_filename = os.path.join(
+            config.output_dir, "alpaca_prop_train.json"
+        )
+        if not os.path.exists(alpaca_prop_train_filename):
+            m_train = make_alpaca_json(
+                dataset=dat,
+                jids=train_ids,
+                config=config,
+                # prop=config.property_name,
+                # instruction=config.instruction,
+                # chem_info=config.chem_info,
+                # output_prompt=config.output_prompt,
+            )
+            dumpjson(data=m_train, filename=alpaca_prop_train_filename)
         else:
-            tmp = config.separator.join(map(str, tmp))
+            print(alpaca_prop_train_filename, " exists")
+            m_train = loadjson(alpaca_prop_train_filename)
+        print("Sample:\n", m_train[0])
 
-        # if ";" in i[1]:
-        #    tmp = "\n".join([str(round(float(j), 2)) for j in i[1].split(";")])
-        # else:
-        #    tmp = str(round(float(i[1]), 3))
-        info[config.prop] = (
-            tmp  # float(i[1])  # [float(j) for j in i[1:]]  # float(i[1]
+        alpaca_prop_test_filename = os.path.join(
+            config.output_dir, "alpaca_prop_test.json"
         )
-        pth = os.path.join(run_path, info["id"])
-        if config.file_format == "poscar":
-            atoms = Atoms.from_poscar(pth)
-        elif config.file_format == "xyz":
-            atoms = Atoms.from_xyz(pth)
-        elif config.file_format == "cif":
-            atoms = Atoms.from_cif(pth)
-        elif config.file_format == "pdb":
-            # not tested well
-            atoms = Atoms.from_pdb(pth)
-        info["atoms"] = atoms.to_dict()
-        dat.append(info)
+        if not os.path.exists(alpaca_prop_test_filename):
 
-    train_ids = ids[0:num_train]
-    print("num_train", num_train)
-    print("num_test", num_test)
-    test_ids = ids[num_train : num_train + num_test]
-    # test_ids = ids[num_train:]
-    alpaca_prop_train_filename = os.path.join(
-        config.output_dir, "alpaca_prop_train.json"
-    )
-    if not os.path.exists(alpaca_prop_train_filename):
-        m_train = make_alpaca_json(
-            dataset=dat,
-            jids=train_ids,
-            config=config,
-            # prop=config.property_name,
-            # instruction=config.instruction,
-            # chem_info=config.chem_info,
-            # output_prompt=config.output_prompt,
-        )
-        dumpjson(data=m_train, filename=alpaca_prop_train_filename)
+            m_test = make_alpaca_json(
+                dataset=dat,
+                jids=test_ids,
+                config=config,
+                # prop="prop",
+                include_jid=True,
+                # instruction=config.instruction,
+                # chem_info=config.chem_info,
+                # output_prompt=config.output_prompt,
+            )
+            dumpjson(data=m_test, filename=alpaca_prop_test_filename)
+        else:
+            print(alpaca_prop_test_filename, "exists")
+            m_test = loadjson(alpaca_prop_test_filename)
+        
+    elif config.use_pretokenized_data == True:
+        pass
+
     else:
-        print(alpaca_prop_train_filename, " exists")
-        m_train = loadjson(alpaca_prop_train_filename)
-    print("Sample:\n", m_train[0])
+        raise ValueError("use_pretokenized_data must be a boolean")
 
-    alpaca_prop_test_filename = os.path.join(
-        config.output_dir, "alpaca_prop_test.json"
-    )
-    if not os.path.exists(alpaca_prop_test_filename):
-
-        m_test = make_alpaca_json(
-            dataset=dat,
-            jids=test_ids,
-            config=config,
-            # prop="prop",
-            include_jid=True,
-            # instruction=config.instruction,
-            # chem_info=config.chem_info,
-            # output_prompt=config.output_prompt,
-        )
-        dumpjson(data=m_test, filename=alpaca_prop_test_filename)
-    else:
-        print(alpaca_prop_test_filename, "exists")
-        m_test = loadjson(alpaca_prop_test_filename)
 
     # 4bit pre quantized models we support for 4x faster downloading + no OOMs.
     model, tokenizer = FastLanguageModel.from_pretrained(
@@ -482,57 +491,73 @@ def main(config_file=None):
             loftq_config=None,  # And LoftQ
         )
 
-    EOS_TOKEN = tokenizer.eos_token  # Must add EOS_TOKEN
-    # tokenizer.pad_token_id = tokenizer.eos_token_id
-    # model.resize_token_embeddings(len(tokenizer))
-    train_dataset = load_dataset(
-        "json",
-        data_files=alpaca_prop_train_filename,
-        split="train",
-        # "json", data_files="alpaca_prop_train.json", split="train"
-    )
-    eval_dataset = load_dataset(
-        "json",
-        data_files=alpaca_prop_test_filename,
-        split="train",
-        # "json", data_files="alpaca_prop_train.json", split="train"
-    )
-    formatting_prompts_func_with_prompt = partial(
-        formatting_prompts_func, alpaca_prompt=config.alpaca_prompt
-    )
-
-    def tokenize_function(example):
-        return tokenizer(
-            example["text"],
-            padding="max_length",
-            truncation=True,
-            max_length=config.max_seq_length,
+    if config.use_pretokenized_data == False:
+        EOS_TOKEN = tokenizer.eos_token  # Must add EOS_TOKEN
+        # tokenizer.pad_token_id = tokenizer.eos_token_id
+        # model.resize_token_embeddings(len(tokenizer))
+        train_dataset = load_dataset(
+            "json",
+            data_files=alpaca_prop_train_filename,
+            split="train",
+            # "json", data_files="alpaca_prop_train.json", split="train"
+        )
+        eval_dataset = load_dataset(
+            "json",
+            data_files=alpaca_prop_test_filename,
+            split="train",
+            # "json", data_files="alpaca_prop_train.json", split="train"
+        )
+        formatting_prompts_func_with_prompt = partial(
+            formatting_prompts_func, alpaca_prompt=config.alpaca_prompt
         )
 
-    train_dataset = train_dataset.map(
-        formatting_prompts_func_with_prompt,
-        batched=True,
-    )
-    eval_dataset = eval_dataset.map(
-        formatting_prompts_func_with_prompt,
-        batched=True,
-    )
-    # Compute the actual max sequence length in raw text
-    lengths = [
-        len(tokenizer(example["text"], truncation=False)["input_ids"])
-        for example in eval_dataset
-    ]
-    max_seq_length = max(lengths)
-    print(f"🧠 Suggested max_seq_length based on dataset: {max_seq_length}")
+        def tokenize_function(example):
+            return tokenizer(
+                example["text"],
+                padding="max_length",
+                truncation=True,
+                max_length=config.max_seq_length,
+            )
 
-    tokenized_train = train_dataset.map(tokenize_function, batched=True)
-    tokenized_eval = eval_dataset.map(tokenize_function, batched=True)
-    tokenized_train.set_format(
-        type="torch", columns=["input_ids", "attention_mask", "output"]
-    )
-    tokenized_eval.set_format(
-        type="torch", columns=["input_ids", "attention_mask", "output"]
-    )
+        train_dataset = train_dataset.map(
+            formatting_prompts_func_with_prompt,
+            batched=True,
+        )
+        eval_dataset = eval_dataset.map(
+            formatting_prompts_func_with_prompt,
+            batched=True,
+        )
+        # Compute the actual max sequence length in raw text
+        lengths = [
+            len(tokenizer(example["text"], truncation=False)["input_ids"])
+            for example in eval_dataset
+        ]
+        max_seq_length = max(lengths)
+        print(f"🧠 Suggested max_seq_length based on dataset: {max_seq_length}")
+
+        tokenized_train = train_dataset.map(tokenize_function, batched=True)
+        tokenized_eval = eval_dataset.map(tokenize_function, batched=True)
+        tokenized_train.set_format(
+            type="torch", columns=["input_ids", "attention_mask", "output"]
+        )
+        tokenized_eval.set_format(
+            type="torch", columns=["input_ids", "attention_mask", "output"]
+        )
+
+    elif config.use_pretokenized_data == True:
+        base_dir = os.path.dirname(os.path.abspath(id_prop_path))
+        pretok_dir = os.path.join(base_dir, str(config.tokenizer_class))
+        tokenized_train = load_from_disk(os.path.join(pretok_dir, "train"))
+        tokenized_eval = load_from_disk(os.path.join(pretok_dir, "test"))
+        tokenized_train.set_format(
+            type="torch", columns=["input_ids", "attention_mask", "output"]
+        )
+        tokenized_eval.set_format(
+            type="torch", columns=["input_ids", "attention_mask", "output"]
+        )
+
+    else:
+        raise ValueError("use_pretokenized_data must be a boolean")
 
     """
     trainer = SFTTrainer(
