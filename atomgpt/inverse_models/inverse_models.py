@@ -98,7 +98,12 @@ class TrainingPropConfig(BaseSettings):
     output_prompt: str = (
         " Generate atomic structure description with lattice lengths, angles, coordinates and atom types."
     )
-    # num_val: Optional[int] = 2
+    use_pretokenized_data: bool = False
+    # the value of the tokenizer_class field will be the name of the directory holding the pretokenized
+    # data. typically, families of LLMs have compatible tokenization schemas, but LLMs of different
+    # families will tokenize text differntly. this field allows users to keep track of how their data
+    # has been tokenized.
+    tokenizer_class: str = "Mistral-LoRA-4b_quantized"
 
 
 def get_input(config=None, chem="", val=10):
