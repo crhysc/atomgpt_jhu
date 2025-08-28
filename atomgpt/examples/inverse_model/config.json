@@ -25,5 +25,6 @@
     "load_in_4bit": true,
     "instruction": "Below is a description of a superconductor material.",
     "alpaca_prompt": "### Instruction:\n{}\n### Input:\n{}\n### Output:\n{}",
-    "output_prompt": " Generate atomic structure description with lattice lengths, angles, coordinates and atom types."
+    "output_prompt": " Generate atomic structure description with lattice lengths, angles, coordinates and atom types.",
+    "hp_cfg_path": "hp_search_config.json"
 }
