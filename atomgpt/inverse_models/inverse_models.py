@@ -332,6 +332,9 @@ def batch_evaluate(
     f.close()
     return gen_atoms
 
+def batched_pretok_evaluate():
+    pass
+
 
 def main(config_file=None):
     if config_file is None:
