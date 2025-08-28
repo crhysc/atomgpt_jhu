@@ -216,7 +216,7 @@ def _train_once(
 
     trainer = SFTTrainer(
         model=model,
-        tokenizer=tok,
+        processing_class=tok,
         train_dataset=train_ds,
         eval_dataset=val_ds,
         dataset_text_field="text",
