@@ -23,6 +23,7 @@ from atomgpt.inverse_models.inverse_models import (
     make_alpaca_json,
     formatting_prompts_func,
     load_model,
+    TrainingPropConfig
 )
 from jarvis.db.jsonutils import dumpjson, loadjson
 from jarvis.core.atoms import Atoms
@@ -40,56 +41,6 @@ logging.basicConfig(
 log = logging.getLogger("hp_search")
 
 # ═════════════════════════════ Config ═══════════════════════════════
-"""
-_SharedConfig contains fields in the normal AtomGPT config.json and the
-new hyperparameter_search.py hp_search_cfg.json
-"""
-class _SharedConfig(BaseSettings):
-    instruction: str = "Below is a description of a material."
-    alpaca_prompt: str = "### Instruction:\n{}\n### Input:\n{}\n### Output:\n{}"
-    chem_info: str = "formula"
-    id_tag: str = "id"
-    prop: str = "Tc_supercon"
-    separator: str = ","
-    output_prompt: str = (
-        " Generate atomic structure description with lattice lengths, angles, coordinates and atom types."
-    )
-
-"""
-TrainingConfig contains values and hyperparameters unique to the normal
-AtomGPT config.json
-"""
-class TrainingConfig(_SharedConfig):
-    hp_cfg_path: str
-    id_prop_path: str
-    model_name: str
-    output_dir: str = "outputs"
-    model_save_path: str = "atomgpt_lora_model"
-    csv_out: str = "eval_results.csv"
-    file_format: Literal["poscar", "xyz", "pdb"] = "poscar"
-    prefix: str = "atomgpt_run"
-
-    num_epochs: int = 2
-    per_device_train_batch_size: int = 2
-    gradient_accumulation_steps: int = 4
-    learning_rate: float = 2e-4
-    lora_rank: int = 16
-    lora_alpha: int = 16
-    max_seq_length: int = 2048
-    optim: str = "adamw_8bit"
-    lr_scheduler_type: str = "linear"
-    warmup_ratio: float = 0.03
-    logging_steps: int = 10
-    seed_val: int = 42
-    dataset_num_proc: int = 2
-    dtype: str | None = None
-    load_in_4bit: bool = True
-
-    val_ratio: float = 0.10
-    test_ratio: float = 0.20
-    num_train: int | None = None
-    num_test: int | None = None
-
 """
 OptunaSearchConfig is a schema for defining hyperparemeters 
 and values specific to a hyperparameter search study conducted 
@@ -223,7 +174,7 @@ def train_val_test_split_ids(
 
 # ═════════════════════ Single train-pass ═════════════════════════════
 def _train_once(
-    cfg: TrainingConfig,
+    cfg: TrainingPropConfig,
     train_json: Path,
     val_json: Path,
     prune_cb: TrainerCallback | None,
@@ -328,7 +279,7 @@ def _train_once(
 # ═════════════════════ Optuna objective ══════════════════════════════
 def objective(
     trial: Trial,
-    train_cfg: TrainingConfig,
+    train_cfg: TrainingPropConfig,
     hp_cfg: OptunaSearchConfig,
     sampler: SearchSpaceSampler,
     train_json: Path,
@@ -387,7 +338,7 @@ def objective(
 
 
 # ═══════════════════ id_prop.csv loader  ════════════════════
-def _load_id_prop_data(id_prop_csv: str, cfg: TrainingConfig) -> List[dict]:
+def _load_id_prop_data(id_prop_csv: str, cfg: TrainingPropConfig) -> List[dict]:
     """
     Read a standard id_prop.csv file and accompanying structure files,
     returning records compatible with `make_alpaca_json`.
@@ -431,10 +382,10 @@ def main() -> None:
     Entrypoint: run an Optuna HPO study for AtomGPT fine-tuning.
     """
     p = argparse.ArgumentParser()
-    p.add_argument("--config_name", required=True, help="Path to a TrainingConfig JSON")
+    p.add_argument("--config_name", required=True, help="Path to a TrainingPropConfig JSON")
     args = p.parse_args()
 
-    train_cfg = TrainingConfig(**json.load(open(args.config_name)))
+    train_cfg = TrainingPropConfig(**json.load(open(args.config_name)))
     hp_cfg = OptunaSearchConfig(**json.load(open(train_cfg.hp_cfg_path)))
 
     objective_metrics = hp_cfg.objective_metrics or (

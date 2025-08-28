@@ -99,6 +99,7 @@ class TrainingPropConfig(BaseSettings):
         " Generate atomic structure description with lattice lengths, angles, coordinates and atom types."
     )
     # num_val: Optional[int] = 2
+    hp_cfg_path: Optional[str] = "hp_search_config.json"
 
 
 def get_input(config=None, chem="", val=10):
