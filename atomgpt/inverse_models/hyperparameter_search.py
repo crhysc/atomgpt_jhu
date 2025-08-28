@@ -378,7 +378,7 @@ def objective(
         if _DEBUG:
             log.debug("Trial %d finished — metrics: %s", trial.number, metrics)
 
-        out = [METRIC_EVALUTATORS[m](metrics) for m in objective_metrics]
+        out = [METRIC_EVALUATORS[m](metrics) for m in objective_metrics]
         return out[0] if len(out) == 1 else tuple(out)
 
     finally:
@@ -500,9 +500,11 @@ def main() -> None:
     print("\nStudy finished in %.1fs" % runtime)
     if len(objective_metrics) == 1:
         print("Best value :", study.best_value)
+        print("Best params:", study.best_params)
     else:
-        print("Best values:", study.best_values)
-    print("Best params :", study.best_params)
+        print("Pareto front (top 5 shown):")
+        for i, t in enumerate(study.best_trials[:5]):
+            print(f"  Trial {t.number}: values={t.values}, params={t.params}")
 
     if _DEBUG:
         log.debug("Full study completed in %.1fs", runtime)
