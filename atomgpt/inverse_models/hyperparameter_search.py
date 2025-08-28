@@ -17,7 +17,7 @@ from transformers import IntervalStrategy, TrainingArguments, TrainerCallback
 from peft import PeftModel
 
 from atomgpt.inverse_models.loader import FastLanguageModel
-from trl import SFTTrainer
+from trl import SFTTrainer, SFTConfig
 from atomgpt.inverse_models.inverse_models import (
     evaluate,
     make_alpaca_json,
@@ -214,31 +214,38 @@ def _train_once(
             len(val_ds),
         )
 
+    sft_args = SFTConfig(
+        # --- training ---
+        output_dir=cfg.output_dir,
+        num_train_epochs=cfg.num_epochs,
+        per_device_train_batch_size=cfg.per_device_train_batch_size,
+        gradient_accumulation_steps=cfg.gradient_accumulation_steps,
+        learning_rate=cfg.learning_rate,
+        warmup_ratio=cfg.warmup_ratio,
+        lr_scheduler_type=cfg.lr_scheduler_type,
+        optim=cfg.optim,
+        fp16=not torch.cuda.is_bf16_supported(),
+        bf16=torch.cuda.is_bf16_supported(),
+        logging_steps=cfg.logging_steps,
+        eval_strategy="epoch",
+        save_strategy="no",
+        report_to="none",
+        seed=cfg.seed_val,
+
+        # --- data prep (must live in config for AtomGPT wrapper) ---
+        dataset_text_field="text",
+        dataset_num_proc=cfg.dataset_num_proc,
+        max_seq_length=cfg.max_seq_length,
+        packing=False,            # or True if you really want packing; wrapper warns about it
+    )
+
     trainer = SFTTrainer(
         model=model,
-        processing_class=tok,
+        args=sft_args,
+        processing_class=tok,     # <- replaces tokenizer=tok
         train_dataset=train_ds,
         eval_dataset=val_ds,
-        max_seq_length=cfg.max_seq_length,
-        dataset_num_proc=cfg.dataset_num_proc,
-        packing=False,
-        args=TrainingArguments(
-            output_dir=cfg.output_dir,
-            num_train_epochs=cfg.num_epochs,
-            per_device_train_batch_size=cfg.per_device_train_batch_size,
-            gradient_accumulation_steps=cfg.gradient_accumulation_steps,
-            learning_rate=cfg.learning_rate,
-            warmup_ratio=cfg.warmup_ratio,
-            lr_scheduler_type=cfg.lr_scheduler_type,
-            optim=cfg.optim,
-            fp16=not torch.cuda.is_bf16_supported(),
-            bf16=torch.cuda.is_bf16_supported(),
-            logging_steps=cfg.logging_steps,
-            eval_strategy="epoch",
-            save_strategy="no",
-            report_to="none",
-            seed=cfg.seed_val,
-        ),
+        # (optional) compute_metrics=..., callbacks=..., peft_config=..., formatting_func=...
     )
     if prune_cb:
         trainer.add_callback(prune_cb)
