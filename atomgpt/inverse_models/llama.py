@@ -3458,8 +3458,15 @@ class FastLlamaModel:
             if hasattr(m, "_saved_temp_tokenizer"):
                 m._saved_temp_tokenizer.padding_side = "right"
             # Set a flag for generation!
-            if hasattr(m, "_flag_for_generation"):
-                del m._flag_for_generation
+            if "_flag_for_generation" in getattr(m, "__dict__", {}):
+                m.__dict__.pop("_flag_for_generation", None)
+            else:
+                try:
+                    # If it exists virtually, neutralize it rather than delete.
+                    setattr(m, "_flag_for_generation", False)
+                except Exception:
+                    print("TRY-EXCEPT-PASS TRIGGERED llama.py line 3468")
+                    pass
 
         pass
         m = model
