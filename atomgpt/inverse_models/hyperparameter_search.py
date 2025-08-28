@@ -219,7 +219,6 @@ def _train_once(
         processing_class=tok,
         train_dataset=train_ds,
         eval_dataset=val_ds,
-        dataset_text_field="text",
         max_seq_length=cfg.max_seq_length,
         dataset_num_proc=cfg.dataset_num_proc,
         packing=False,
