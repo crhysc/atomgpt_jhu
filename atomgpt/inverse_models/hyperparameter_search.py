@@ -17,7 +17,7 @@ from transformers import IntervalStrategy, TrainingArguments, TrainerCallback
 from peft import PeftModel
 
 from atomgpt.inverse_models.loader import FastLanguageModel
-from atomgpt.inverse_models.custom_trainer import CustomSFTTrainer
+from trl import SFTTrainer
 from atomgpt.inverse_models.inverse_models import (
     evaluate,
     make_alpaca_json,
@@ -214,7 +214,7 @@ def _train_once(
             len(val_ds),
         )
 
-    trainer = CustomSFTTrainer(
+    trainer = SFTTrainer(
         model=model,
         tokenizer=tok,
         train_dataset=train_ds,
