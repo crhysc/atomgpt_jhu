@@ -64,14 +64,14 @@ class TrainingPropConfig(BaseSettings):
     gradient_accumulation_steps: int = 4
     num_train: Optional[int] = None
     num_test: Optional[int] = None
-    test_ratio: Optional[float] = 0.2
+    test_ratio: Optional[float] = 0.1
+    val_ratio: Optional[float] = 0.1
     model_save_path: str = "atomgpt_lora_model"
     lora_rank: Optional[int] = 16
     lora_alpha: Optional[int] = 16
     loss_type: str = "default"
     optim: str = "adamw_8bit"
     id_tag: str = "id"
-    save_strategy: str = "st"
     lr_scheduler_type: str = "linear"
     separator: str = ","
     prop: str = "Tc_supercon"
@@ -99,6 +99,14 @@ class TrainingPropConfig(BaseSettings):
         " Generate atomic structure description with lattice lengths, angles, coordinates and atom types."
     )
     # num_val: Optional[int] = 2
+    hp_cfg_path: Optional[str] = "hp_search_config.json"
+    per_device_train_batch_size: int = 2
+    gradient_accumulation_steps: int = 4
+    warmup_steps: int = 3
+    warmup_ratio: float = 0.0
+    logging_steps: int = 10
+
+
 
 
 def get_input(config=None, chem="", val=10):
@@ -573,12 +581,13 @@ def main(config_file=None):
         args=SFTConfig(
             dataset_text_field="text",
             max_seq_length=config.max_seq_length,
-            per_device_train_batch_size=2,
-            gradient_accumulation_steps=4,
-            warmup_steps=5,
+            per_device_train_batch_size=config.per_device_train_batch_size,
+            gradient_accumulation_steps=config.gradient_accumulation_steps,
+            warmup_steps=config.warmup_steps,
             overwrite_output_dir=True,
+            warmup_ratio=config.warmup_ratio,
             # max_steps=60,
-            logging_steps=1,
+            logging_steps=config.logging_steps,
             output_dir=config.output_dir,
             optim=config.optim,
             seed=config.seed_val,
