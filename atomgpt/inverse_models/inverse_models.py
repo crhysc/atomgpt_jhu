@@ -27,6 +27,7 @@ import pprint
 from jarvis.io.vasp.inputs import Poscar
 import csv
 import os
+import numpy as np
 from pydantic_settings import BaseSettings
 import sys
 import json
@@ -205,42 +206,96 @@ def load_model(path="", config=None):
     FastLanguageModel.for_inference(model)
     return model, tokenizer, config
 
+def _validate_atoms(atoms):
+    if atoms is None:
+        return False, "atoms_is_none"
+    try:
+        lat = np.asarray(getattr(atoms, "lattice_mat", None), dtype=float)
+        if lat.shape != (3, 3):
+            return False, f"bad_lattice_shape:{getattr(atoms,'lattice_mat',None)}"
+        if not np.isfinite(lat).all():
+            return False, "nonfinite_lattice"
+        n = getattr(atoms, "num_atoms", None)
+        if n is None or n <= 0:
+            return False, f"num_atoms_invalid:{n}"
+        _ = Poscar(atoms).to_string()
+        return True, ""
+    except Exception as e:
+        return False, f"poscar_fail:{type(e).__name__}:{e}"
+
+def _poscar_one_line(at):
+    return Poscar(at).to_string().replace("\n", "\\n")
+
+def _misses_path(csv_out, config):
+    fname = getattr(config, "miss_csv", None)
+    if fname is None or not str(fname).strip():
+        root, ext = os.path.splitext(csv_out)
+        fname = root + ".misses.csv"
+    os.makedirs(os.path.dirname(os.path.abspath(fname)), exist_ok=True)
+    return fname
 
 def evaluate(
-    test_set=[], model="", tokenizer="", csv_out="out.csv", config=""
+    test_set=[],
+    model="",
+    tokenizer="",
+    csv_out="out.csv",
+    config="",
 ):
     print("Testing\n", len(test_set))
-    f = open(csv_out, "w")
-    f.write("id,target,prediction\n")
+    os.makedirs(os.path.dirname(os.path.abspath(csv_out)), exist_ok=True)
+    miss_csv_out = _misses_path(csv_out, config)
 
-    for i in tqdm(test_set, total=len(test_set)):
-        # try:
-        # prompt = i["input"]
-        # print("prompt", prompt)
-        gen_mat = gen_atoms(
-            prompt=i["input"],
-            tokenizer=tokenizer,
-            model=model,
-            alpaca_prompt=config.alpaca_prompt,
-            instruction=config.instruction,
-        )
-        target_mat = text2atoms("\n" + i["output"])
-        print("target_mat", target_mat)
-        print("genmat", gen_mat)
-        line = (
-            i["id"]
-            + ","
-            + Poscar(target_mat).to_string().replace("\n", "\\n")
-            + ","
-            + Poscar(gen_mat).to_string().replace("\n", "\\n")
-            + "\n"
-        )
-        f.write(line)
-        # print()
-    # except Exception as exp:
-    #    print("Error", exp)
-    #    pass
-    f.close()
+    with open(csv_out, "w", newline="") as f_ok, open(miss_csv_out, "w", newline="") as f_miss:
+        ok_writer = csv.writer(f_ok)
+        miss_writer = csv.writer(f_miss)
+        ok_writer.writerow(["id", "target", "prediction"])
+        miss_writer.writerow(["id", "stage", "error", "detail", "raw_text_preview"])
+
+        for i in tqdm(test_set, total=len(test_set)):
+            sample_id = i.get("id", "")
+            target_mat = None
+            target_err = None
+            try:
+                target_mat = text2atoms("\n" + i["output"])
+                ok, detail = _validate_atoms(target_mat)
+                if not ok:
+                    target_err = detail
+            except Exception as e:
+                target_err = f"text2atoms:{type(e).__name__}:{e}"
+
+            if target_err:
+                miss_writer.writerow([sample_id, "target", "invalid_target", target_err, (i.get("output","")[:240])])
+                continue
+
+            gen_mat = None
+            gen_err = None
+            try:
+                gen_mat = gen_atoms(
+                    prompt=i["input"],
+                    tokenizer=tokenizer,
+                    model=model,
+                    alpaca_prompt=config.alpaca_prompt,
+                    instruction=config.instruction,
+                )
+                ok, detail = _validate_atoms(gen_mat)
+                if not ok:
+                    gen_err = detail
+            except Exception as e:
+                gen_err = f"gen_atoms:{type(e).__name__}:{e}"
+
+            if gen_err:
+                miss_writer.writerow([sample_id, "prediction", "invalid_prediction", gen_err, ""])
+                continue
+
+            try:
+                ok_writer.writerow([
+                    sample_id,
+                    _poscar_one_line(target_mat),
+                    _poscar_one_line(gen_mat),
+                ])
+            except Exception as e:
+                miss_writer.writerow([sample_id, "write", "write_failed", f"{type(e).__name__}:{e}", ""])
+
 
 
 def batch_evaluate(
