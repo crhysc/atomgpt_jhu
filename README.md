@@ -221,6 +221,8 @@ Funding support
 
 NIST-MGI (https://www.nist.gov/mgi) and CHIPS (https://www.nist.gov/chips)
 
+Note: This project was originally developed under the github.com/usnistgov organization. New updates and developments will be carried out here.
+
 Code of conduct
 --------------------
 

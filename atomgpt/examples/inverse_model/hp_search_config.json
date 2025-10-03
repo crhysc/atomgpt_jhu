@@ -1,0 +1,25 @@
+{
+  "n_trials": 25,
+  "time_repeats": 1,
+  "objective_metric": "final_eval_loss",
+  "parameters": {
+    "learning_rate": { "type": "float", "low": 5e-6, "high": 5e-4, "log": true, "include": true },
+    "per_device_train_batch_size": { "type": "categorical", "choices": [1, 2, 4], "include": true },
+    "num_epochs": { "type": "int", "low": 1, "high": 5, "include": false },
+    "gradient_accumulation_steps": { "type": "categorical", "choices": [1, 2, 4, 8], "include": false },
+    "lora_rank": { "type": "categorical", "choices": [8, 16, 32, 64], "include": false },
+    "lora_alpha": { "type": "categorical", "choices": [8, 16, 32, 64], "include": false },
+    "max_seq_length": { "type": "categorical", "choices": [1024, 1536, 2048], "include": false },
+    "optim": { "type": "categorical", "choices": ["adamw_torch", "adamw_torch_fused", "adamw_bnb_8bit", "adamw_hf"], "include": false },
+    "lr_scheduler_type": { "type": "categorical", "choices": ["linear", "cosine", "cosine_with_restarts", "polynomial", "constant_with_warmup"], "include": false },
+    "warmup_ratio": { "type": "float", "low": 0.0, "high": 0.1, "include": false },
+    "logging_steps": { "type": "int", "low": 5, "high": 200, "include": false },
+    "seed_val": { "type": "int", "low": 1, "high": 10000, "include": false },
+    "dataset_num_proc": { "type": "categorical", "choices": [1, 2, 4, 8], "include": false },
+    "val_ratio": { "type": "float", "low": 0.05, "high": 0.2, "include": false },
+    "test_ratio": { "type": "float", "low": 0.1, "high": 0.3, "include": false },
+    "num_train": { "type": "int", "low": 0, "high": 1000000, "include": false },
+    "num_test": { "type": "int", "low": 0, "high": 100000, "include": false }
+  }
+}
+
